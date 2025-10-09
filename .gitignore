@@ -1,4 +1,10 @@
 /node_modules
 /uploads/*
 !/uploads/placeholder.jpeg
+
+# Environment variables
 .env
+.env.development
+.env.production
+!.env.example
+.env.example

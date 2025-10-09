@@ -13,7 +13,14 @@ import { setFastifyRoutes } from "./routes/index.js";
 import { setFastifyStatic } from "./static.js";
 import { setFastifyWebsocket } from "./websocket/index.js";
 
-dotenv.config();
+// Load environment variables based on NODE_ENV
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development';
+dotenv.config({ path: envFile });
+
+// Fallback to .env if environment-specific file doesn't exist
+if (!process.env.SECRET_KEY) {
+  dotenv.config({ path: '.env' });
+}
 
 /**
  * The Fastify instance.
@@ -24,7 +31,11 @@ export const fastify = await Fastify({ logger: process.env.LOGGER || true });
 // We allow Multi Part Form
 fastify.register(FastifyMultipart);
 // We add Secret Key
-fastify.register(FastifyJwt, { secret: process.env.SECRET_KEY || "secret" });
+const jwtSecret = process.env.SECRET_KEY;
+if (!jwtSecret) {
+  throw new Error('SECRET_KEY environment variable is required');
+}
+fastify.register(FastifyJwt, { secret: jwtSecret });
 // We add Salt
 fastify.register(FastifyBcrypt, {
   saltWorkFactor: Number(process.env.SALT) || 12,
@@ -42,7 +53,7 @@ fastify.decorate("authenticate", async function (request, reply) {
     const user = await request.jwtVerify();
     request.user = user;
   } catch (err) {
-    reply.send(err);
+    return reply.status(401).send({ message: "Unauthorized" });
   }
 });
 // Generate API documentation
@@ -57,10 +68,7 @@ setFastifyRoutes(fastify);
 setFastifyWebsocket();
 
 mongoose
-  .connect(process.env.DB_CONNECT, {
-    useUnifiedTopology: true,
-    useNewUrlParser: true,
-  })
+  .connect(process.env.DB_CONNECT)
   .then(() => {
     const PORT = process.env.PORT || 5000;
     try {
